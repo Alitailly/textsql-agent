@@ -3,6 +3,16 @@
 Status: ready-for-agent
 Proposed triage: ready-for-agent（本目录尚未配置 issue tracker；规格先落在 `.scratch/textsql-agent/`）
 
+> **本文件是原始规格快照，部分条款已被后来的 ADR 取代。** 现状以 `CONTEXT.md` + `textsql-agent-flow.md` + `docs/adr/` 为准。
+>
+> **已被 ADR 0001 取代**（本条把主 Agent 描述成一次性的二选一开关）：
+> - Solution 段「每一句用户话，主 Agent 只规划一次」；User Story 21（只在二者里选一次）、28（「只有一次分流」）；Implementation Decisions 第 3 条。
+> - 「同一句不又搜网页又调查数工具」：User Story 2d、22b（联网搜索只在环 A 可调）、22c（查询数的这一句不调联网搜索）。
+>   **现行设计是**：联网搜索是主 Agent 自己的动作，典型发生在拿到查数回填之后，不在环 B 内，也不是环 A 的专利。
+> - Further Notes 最后一条「HTML 说明页把入口画成『只有一次分流』」。
+>
+> **已被 ADR 0002 取代**：全文的「四项查询摘要 / 四项摘要」→ 查询摘要改为**自由文本**（段名「需求说明」），程序不解析其内容。含 User Story 32/34/35、Implementation Decisions 的小模型输出契约（那个五行代码块）。
+
 ## Problem Statement
 
 我要用自然语言跟一个主 Agent 多轮问数。主 Agent 必须能聊天，也必须能查库，但不能自己写 SQL、不能自己连库。查数必须封装成主 Agent 的一个查数工具：传入当前问题，内部跑完环 B 再回填；一句最多调一次。联网搜索要先设计好工具契约，但默认关闭、先不挂到主 Agent 上，以后要再用时再开。查失败不能把上一轮已经查对的 SQL 和摘要丢掉。0 行要告诉我没查到，并且能拿这条空查询当下一轮续问的底座。网页上搜到的数字不能当成我库里的数。我不要槽位状态机，也不要再发明一套检索。
@@ -146,7 +156,7 @@ Proposed triage: ready-for-agent（本目录尚未配置 issue tracker；规格�
 
 ## Further Notes
 
-- 规格用语以 `CONTEXT.md` 为准。流程以 `textsql-agent-flow.md` 为准。B3 提示词以 `textsql-rewrite-prompt.md` 为准。ADR `docs/adr/0001-one-plan-per-user-utterance.md` 记录「一句用户话只规划一次」。
+- 规格用语以 `CONTEXT.md` 为准。流程以 `textsql-agent-flow.md` 为准。B3 提示词以 `textsql-rewrite-prompt.md` 为准。ADR `docs/adr/0001-main-agent-decision-loop.md` 记录「主 Agent 是一个决策循环」。
 - 未设计 / 未接线清单：`textsql-agent/docs/agents/undesigned.md`。假数据来自替身；规格未定项不要猜。
 - **测试缝（请确认）：** 只在「一轮」这一处测。夹具注入会话和两个程序槽，送一句用户话，断言回复、查数工具次数（环 A 必须为 0，环 B 必须为 1）、联网搜索次数（默认必须为 0）、工具入参/回填、只读次数、落盘。不为主 Agent / 小模型 / RAG / 查库对话 / 搜索引擎各开一条缝。
 - HTML 说明页把入口画成「只有一次分流」，不是实现状态机；测试按本规格的一轮定义。

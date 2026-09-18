@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Text-SQL · 两套闭环</title>
+  <title>Text-SQL · 主 Agent 决策循环</title>
   <style>
     :root { --bg:#0c1016; --ink:#e8eef5; --muted:#8f9eae; }
     * { box-sizing: border-box; }
@@ -20,7 +20,8 @@
       border-radius: 14px; padding: 16px 18px; margin-bottom: 28px;
     }
     .pick h2 { margin: 0 0 8px; font-size: 1.05rem; }
-    .pick p { margin: 0; color: #c5d0dc; font-size: .9rem; line-height: 1.5; }
+    .pick p { margin: 0 0 8px; color: #c5d0dc; font-size: .9rem; line-height: 1.5; }
+    .pick p:last-child { margin-bottom: 0; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
     .card {
@@ -49,6 +50,7 @@
     .nc { background: #2a6844; }
     .nd { background: #4a3d68; }
     .ne { background: #6a4a1c; }
+    .nf { background: #6a2c2c; }
     details { margin-top: 14px; }
     details summary { cursor: pointer; font-size: .88rem; color: #c5d0dc; }
     .ctx {
@@ -56,26 +58,57 @@
       font-size: .76rem; line-height: 1.5; background: #0b0f14;
       padding: 10px; border-radius: 8px; white-space: pre-wrap; color: #c9d4e0;
     }
+    .loop {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+      align-items: center; margin-bottom: 6px;
+    }
+    @media (max-width: 720px) { .loop { grid-template-columns: 1fr; } }
+    .branch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
+    @media (max-width: 720px) { .branch { grid-template-columns: 1fr; } }
+    .tag {
+      display: inline-block; font-size: .72rem; padding: 1px 7px; border-radius: 999px;
+      background: rgba(255,255,255,.1); color: #c5d0dc; margin-left: 6px;
+    }
   </style>
 </head>
 <body>
   <div class="page">
-    <h1>两套闭环，分开画</h1>
-    <p class="lead">词以 CONTEXT.md 为准。B3 提示词以 textsql-rewrite-prompt.md 为准。主 Agent 按 ReAct（Reason + Act）转圈。不是 React 前端。每一句用户话只进环 A 或环 B。</p>
+    <h1>主 Agent 是一个决策循环</h1>
+    <p class="lead">词以 CONTEXT.md 为准。B3 提示词以 textsql-rewrite-prompt.md 为准。主 Agent 按 ReAct（Reason + Act）转圈——不是 React 前端，也不是「一句只规划一次」的二选一开关。</p>
 
     <div class="pick">
-      <h2>入口（只有一次分流）</h2>
-      <p>用户说话 → 主 Agent 规划：不查库走左边环 A（不调查数工具）；要查库则调查数工具一次，内部跑右边环 B。先澄清再查：本句环 A，下一句再调查数工具。联网搜索已设计、默认关闭。</p>
+      <h2>起点：每一圈只问一句话</h2>
+      <p><strong>「手上这些材料，够不够回答用户？」</strong> 够了就说话、本轮结束；不够就调一个工具，拿到回填，再问一遍。</p>
+      <p>主 Agent 不写 SQL、不查库，<strong>也不参与改写问题</strong>。它交给查数工具的只有「当前问题」这一句；改写完全由工具内部的小模型负责。</p>
     </div>
 
-    <div class="grid">
+    <section class="card" style="border-top:3px solid #5a4d78">
+      <h2>循环本体</h2>
+      <p class="sub">一轮（用户的一句话）里可以转好几圈，中途可以换工具</p>
+      <div class="loop">
+        <div class="node nb">思考<small>够不够回答？</small></div>
+        <div class="node nb">行动<small>说话 / 查数 / 搜索</small></div>
+        <div class="node nb">观察<small>看工具回填</small></div>
+        <div class="node nb">再思考<small>还缺什么？</small></div>
+        <div class="node na">说话<small>本轮结束</small></div>
+      </div>
+      <div class="down">└──────────────── 不够就调工具，回到「思考」 ────────────────┘</div>
+
+      <div class="branch">
+        <div class="node nc">调查数工具<span class="tag">默认开启</span><small>每轮最多 1 次 · 内部跑环 B</small></div>
+        <div class="node nf">联网搜索<span class="tag">默认关闭</span><small>拿到库内容后按需 · 每轮最多 3 次</small></div>
+        <div class="node na">不说话就不算完<small>工具被拒 = 从可见工具集摘掉，不打断整轮</small></div>
+      </div>
+    </section>
+
+    <div class="grid" style="margin-top:20px">
       <section class="card a">
         <h2>环 A · 正常对话</h2>
-        <p class="sub">不查库。联网搜索已设计、默认关闭。不调用小模型、Vanna RAG、查库大模型</p>
+        <p class="sub">不查库。主 Agent 直接用会话记忆说话。不调用小模型、Vanna RAG、查库大模型</p>
 
         <div class="node na">A1 用户说话</div>
         <div class="down">▼</div>
-        <div class="node nb">A2 主 Agent<div><small>规划：不查数 · 会话记忆 · 大模型说话</small></div></div>
+        <div class="node nb">A2 主 Agent<div><small>会话记忆 · 大模型说话 · 联网搜索开启后可先搜再说话</small></div></div>
         <div class="down">▼</div>
         <div class="node na">A3 回复用户</div>
         <div class="back">↑ 回到 A1，等下一句</div>
@@ -86,26 +119,24 @@
 [会话记忆]
 [用户本轮这句话]
 → 回复用户
-联网搜索：已设计，默认不挂载</div>
+联网搜索：默认不挂载；开启后本环也可先搜再说话</div>
         </details>
       </section>
 
       <section class="card b">
-        <h2>环 B · 查数</h2>
-        <p class="sub">主 Agent 调查数工具一次；内部：小模型改写 → RAG 一次 → 查库对话</p>
+        <h2>环 B · 查数工具内部</h2>
+        <p class="sub">主 Agent 调查数工具一次即进入；跑完回填、离开环 B</p>
 
-        <div class="node na">B1 用户说话</div>
+        <div class="node nb">B2 主 Agent<div><small>写出当前问题 · 调查数工具一次 —— 到此为止，不改写</small></div></div>
         <div class="down">▼</div>
-        <div class="node nb">B2 主 Agent<div><small>规划：要查数 · 写出当前问题 · 调查数工具一次</small></div></div>
-        <div class="down">▼</div>
-        <div class="node nc">B3 小模型改写<div><small>改写问题 + 需求说明</small></div></div>
+        <div class="node nc">B3 小模型改写<div><small>改写问题 + 需求说明（改写全部在这一步）</small></div></div>
         <div class="down">▼ 改写问题进 Vanna RAG</div>
-        <div class="node nd">B4 Vanna 内 RAG（三字段对照一次）</div>
+        <div class="node nd">B4 Vanna 内 RAG（三路对照一次）</div>
         <div class="down">▼ 新 RAG = 全新查库对话</div>
         <div class="node ne">B5 查库对话<div><small>只读跑 SQL · 最多 5 次 · 超时 30 秒 · 0 行也停</small></div></div>
         <div class="down">▼ 回填</div>
-        <div class="node nb">B6 回复用户<div><small>查库成功才成对写 SQL+摘要</small></div></div>
-        <div class="back">↑ 回到 B1，等下一句</div>
+        <div class="node nb">B6 回填主 Agent<div><small>查库成功才成对写 SQL + 摘要</small></div></div>
+        <div class="back">↑ 主 Agent 回到决策循环，决定说话还是再要材料</div>
 
         <details>
           <summary>查数工具（默认开启）</summary>
@@ -120,7 +151,7 @@
           <summary>B3 小模型</summary>
           <div class="ctx">[固定前缀]
 [上次 SQL]  ← 没有就空
-[查询摘要]  ← 指标/时间/过滤/口径；没有就空
+[查询摘要]  ← 没有就空
 [当前问题]
 → 改写问题 + 需求说明
 全文：textsql-rewrite-prompt.md</div>
@@ -134,6 +165,28 @@
         </details>
       </section>
     </div>
+
+    <section class="card" style="margin-top:20px;border-top:3px solid #6a2c2c">
+      <h2>关键：联网搜索是主 Agent 的决定，不在环 B 内</h2>
+      <p class="sub">它既不是环 A 的专利，也不是环 B 的一个环节。典型情形正是这个项目的价值主张所在。</p>
+      <div class="ctx">主 Agent 调查数工具 → 拿到库里的确切事实（谁、多少粉、什么类目、哪个邮箱）
+        ↓
+判断：光拿这些回复用户，不够 / 不对
+        ↓
+联网搜索，补充库外的时效性内容
+        ↓
+把「库里的锚点」和「网上的补充」合成一句回复</div>
+      <div class="ctx" style="margin-top:10px">库给的是  不可幻觉的锚点
+搜索给的是 时效性
+主 Agent 给的是 合成
+—— 三样缺一样，就跟通用网页版没区别</div>
+      <div class="ctx" style="margin-top:10px">名称：联网搜索    调用方：仅主 Agent    开关：默认关闭，不挂载
+入：一句搜索词
+出（成功）：最多 5 条；每条 标题 / 网址 / 摘要（单条截到约 300 字）
+出（失败）：错误原文；对人说明搜不到，不编网页内容
+保险丝：每轮最多 3 次；单次超时 15 秒，算一次失败并计入这 3 次
+回填进主 Agent 会话，不写进上次 SQL / 查询摘要；网页数字不当成库里的数</div>
+    </section>
 
     <section class="card" style="margin-top:20px;border-top:3px solid #5a4d78">
       <h2>Vanna 连库 · 框架内 RAG（不外挂）</h2>
@@ -150,14 +203,19 @@
     </section>
 
     <section class="card" style="margin-top:20px;border-top:3px solid #3d6a8a">
-      <h2>前提：ReAct 思考模式（为什么是环）</h2>
+      <h2>ReAct 思考模式（为什么是循环）</h2>
       <p class="sub">不是 React 前端。是 Reason + Act：思考 → 行动 → 观察 → 再思考。</p>
-      <div class="ctx">观察：用户这句话 / 查库结果、没查到、或报错（联网搜索开启后才有搜索结果）
-思考：主 Agent 规划 —— 聊天还是查数？写出当前问题
-行动：环 A 直接说话；要查数则调查数工具一次（内部跑环 B）
-再观察：查数工具回填 → 对人说 → 等下一句
+      <div class="ctx">观察：用户这句话；工具回填 —— 查数结果、没查到、报错，或搜索结果
+思考：主 Agent 自问 —— 现在够不够回答用户？还缺什么？
+行动：说话；或调查数工具一次；或联网搜索（默认关闭）
+再观察：工具回填或用户下一句 → 再思考
 
-查数工具内部改 SQL 再跑，是 B5 小环，不是主 Agent 再调一次查数工具。联网搜索已设计、默认关闭。</div>
+三条路：
+  纯对话    观察用户 → 不用查库 → 说话 → 等下一句
+  查数      观察用户 → 要库里的锚点 → 写当前问题 → 调查数工具 → 观察回填
+  查完不够  观察回填 → 这些不足以回答 → 联网搜索 → 观察结果 → 合成回复
+
+查数工具内部改 SQL 再跑，是 B5 小环，不是主 Agent 再调一次查数工具。</div>
     </section>
   </div>
 </body>
