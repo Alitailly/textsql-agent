@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Text-SQL · 两套闭环</title>
+  <style>
+    :root { --bg:#0c1016; --ink:#e8eef5; --muted:#8f9eae; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg); padding: 28px 16px 56px;
+    }
+    .page { max-width: 1080px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 1.5rem; }
+    .lead { color: var(--muted); line-height: 1.55; margin: 0 0 24px; max-width: 52em; }
+    .pick {
+      background: #141a22; border: 1px solid rgba(255,255,255,.1);
+      border-radius: 14px; padding: 16px 18px; margin-bottom: 28px;
+    }
+    .pick h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    .pick p { margin: 0; color: #c5d0dc; font-size: .9rem; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: #141a22; border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px; padding: 16px 14px 20px;
+    }
+    .card.a { border-top: 3px solid #3d8a6a; }
+    .card.b { border-top: 3px solid #b08a40; }
+    .card h2 { margin: 0 0 4px; font-size: 1.12rem; }
+    .card .sub { color: var(--muted); font-size: .84rem; margin: 0 0 12px; }
+    .node {
+      border-radius: 10px; padding: 10px 12px; text-align: center;
+      border: 1px solid rgba(255,255,255,.12); font-size: .9rem; line-height: 1.4;
+    }
+    .node small { display: block; color: rgba(255,255,255,.65); font-size: .76rem; margin-top: 3px; }
+    .down {
+      text-align: center; color: #8aa0b4; font-size: .78rem;
+      padding: 8px 0;
+    }
+    .back {
+      margin-top: 8px; text-align: center; font-size: .8rem; color: #9eb0c2;
+      padding: 8px; border: 1px dashed rgba(150,170,190,.35); border-radius: 8px;
+    }
+    .na { background: #1e4a3a; }
+    .nb { background: #2c4a7a; }
+    .nc { background: #2a6844; }
+    .nd { background: #4a3d68; }
+    .ne { background: #6a4a1c; }
+    details { margin-top: 14px; }
+    details summary { cursor: pointer; font-size: .88rem; color: #c5d0dc; }
+    .ctx {
+      margin-top: 8px; font-family: ui-monospace, Consolas, monospace;
+      font-size: .76rem; line-height: 1.5; background: #0b0f14;
+      padding: 10px; border-radius: 8px; white-space: pre-wrap; color: #c9d4e0;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>两套闭环，分开画</h1>
+    <p class="lead">词以 CONTEXT.md 为准。B3 提示词以 textsql-rewrite-prompt.md 为准。主 Agent 按 ReAct（Reason + Act）转圈。不是 React 前端。每一句用户话只进环 A 或环 B。</p>
+
+    <div class="pick">
+      <h2>入口（只有一次分流）</h2>
+      <p>用户说话 → 主 Agent 规划：不查库走左边环 A（不调查数工具）；要查库则调查数工具一次，内部跑右边环 B。先澄清再查：本句环 A，下一句再调查数工具。联网搜索已设计、默认关闭。</p>
+    </div>
+
+    <div class="grid">
+      <section class="card a">
+        <h2>环 A · 正常对话</h2>
+        <p class="sub">不查库。联网搜索已设计、默认关闭。不调用小模型、Vanna RAG、查库大模型</p>
+
+        <div class="node na">A1 用户说话</div>
+        <div class="down">▼</div>
+        <div class="node nb">A2 主 Agent<div><small>规划：不查数 · 会话记忆 · 大模型说话</small></div></div>
+        <div class="down">▼</div>
+        <div class="node na">A3 回复用户</div>
+        <div class="back">↑ 回到 A1，等下一句</div>
+
+        <details open>
+          <summary>环 A 上下文</summary>
+          <div class="ctx">[系统：对人说话，精确数只来自查库回填]
+[会话记忆]
+[用户本轮这句话]
+→ 回复用户
+联网搜索：已设计，默认不挂载</div>
+        </details>
+      </section>
+
+      <section class="card b">
+        <h2>环 B · 查数</h2>
+        <p class="sub">主 Agent 调查数工具一次；内部：小模型改写 → RAG 一次 → 查库对话</p>
+
+        <div class="node na">B1 用户说话</div>
+        <div class="down">▼</div>
+        <div class="node nb">B2 主 Agent<div><small>规划：要查数 · 写出当前问题 · 调查数工具一次</small></div></div>
+        <div class="down">▼</div>
+        <div class="node nc">B3 小模型改写<div><small>改写问题 + 需求说明</small></div></div>
+        <div class="down">▼ 改写问题进 Vanna RAG</div>
+        <div class="node nd">B4 Vanna 内 RAG（三字段对照一次）</div>
+        <div class="down">▼ 新 RAG = 全新查库对话</div>
+        <div class="node ne">B5 查库对话<div><small>只读跑 SQL · 最多 5 次 · 超时 30 秒 · 0 行也停</small></div></div>
+        <div class="down">▼ 回填</div>
+        <div class="node nb">B6 回复用户<div><small>查库成功才成对写 SQL+摘要</small></div></div>
+        <div class="back">↑ 回到 B1，等下一句</div>
+
+        <details>
+          <summary>查数工具（默认开启）</summary>
+          <div class="ctx">名称：查数工具
+入：当前问题
+出：有行 → SQL+截断结果；0 行 → 没查到；失败用尽 → 最后SQL+报错
+副作用：成功则成对覆盖上次 SQL+需求说明
+内部：B3→B6，主 Agent 不可插步
+同一句最多调 1 次</div>
+        </details>
+        <details>
+          <summary>B3 小模型</summary>
+          <div class="ctx">[固定前缀]
+[上次 SQL]  ← 没有就空
+[查询摘要]  ← 指标/时间/过滤/口径；没有就空
+[当前问题]
+→ 改写问题 + 需求说明
+全文：textsql-rewrite-prompt.md</div>
+        </details>
+        <details>
+          <summary>B5 查库对话 / B6 落盘</summary>
+          <div class="ctx">只给只读查库工具。报错或超时：对话内改 SQL 再跑。
+有行或 0 行：查库成功，离开 B5，丢掉这次对话。
+0 行：对人说没查到，仍覆盖两个槽。
+5 次用尽仍失败：两槽不动，本轮摘要扔掉。</div>
+        </details>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:20px;border-top:3px solid #5a4d78">
+      <h2>Vanna 连库 · 框架内 RAG（不外挂）</h2>
+      <p class="sub">检索只用 Vanna 自带 RAG。query 是改写问题。查库的是大模型，只调只读工具。</p>
+      <div class="ctx">Vanna 配置
+  ├── 框架内 RAG（DDL / 文档 / 问题-SQL）
+  ├── 查库大模型（查库对话；不再检索第二遍）
+  └── 只读数据库连接 + 只读查库工具（最多 5 次，超时 30 秒）</div>
+      <div class="ctx" style="margin-top:10px">改写问题
+  ├─ 对照 DDL/表结构     → 相关表、字段
+  ├─ 对照 文档/口径      → 指标含义、同义词
+  └─ 对照 问题-SQL 样例  → 相似问法的 SQL
+→ 三路命中 → 交给这一次查库对话</div>
+    </section>
+
+    <section class="card" style="margin-top:20px;border-top:3px solid #3d6a8a">
+      <h2>前提：ReAct 思考模式（为什么是环）</h2>
+      <p class="sub">不是 React 前端。是 Reason + Act：思考 → 行动 → 观察 → 再思考。</p>
+      <div class="ctx">观察：用户这句话 / 查库结果、没查到、或报错（联网搜索开启后才有搜索结果）
+思考：主 Agent 规划 —— 聊天还是查数？写出当前问题
+行动：环 A 直接说话；要查数则调查数工具一次（内部跑环 B）
+再观察：查数工具回填 → 对人说 → 等下一句
+
+查数工具内部改 SQL 再跑，是 B5 小环，不是主 Agent 再调一次查数工具。联网搜索已设计、默认关闭。</div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# 数据。真库不随仓库分发：里面是真实的博主联系邮箱，且体积 223MB
+# 超出 GitHub 单文件 100MB 上限。跑真管线请自备同结构的库（见 README）。
+*.sqlite3
+*.sqlite
+*.db
+
+# macOS
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+
+# 编辑器
+.idea/
+.vscode/
